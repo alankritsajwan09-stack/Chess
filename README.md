@@ -45,13 +45,10 @@ python download_legends.py
 ## 🛠️ Built With
 
 - **HTML** – structure and layout
+- **CSS** - designing the structure
 - **JavaScript** – game logic
 - **Python** – asset downloading utility
 
 ## 📌 Status
 
 This project is a work in progress. Contributions, suggestions, and feedback are welcome.
-
-## 📄 License
-
-No license specified yet. Feel free to add one (e.g. MIT) if you'd like others to reuse this project.
