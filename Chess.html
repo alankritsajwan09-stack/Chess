@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chess Game</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@900&family=Cinzel:wght@700&display=swap');
+        #portal-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            overflow: hidden;
+            cursor: ns-resize;
+            /* The Norse realm background revealed as gate opens */
+            background: #050208;
+        }
+
+        #portal-bg {
+            position: absolute;
+            inset: 0;
+            background-image: url('norse_realm_bg.png');
+            background-size: cover;
+            background-position: center center;
+            z-index: 0;
+            filter: brightness(0.85) saturate(1.1);
+        }
+        #portal-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 80% 80% at 50% 40%, transparent 20%, rgba(0,0,0,0.45) 100%);
+        }
+
+
+        #gate-burst {
+            position: absolute;
+            left: 15.5%;
+            top: 1.428%;
+            width: 69%;
+            height: 94%;
+            z-index: 3;
+            opacity: 0;
+            pointer-events: none;
+            border-radius: 50% 50% 0 0 / 22% 22% 0 0;
+            background: radial-gradient(
+                ellipse 50% 50% at 50% 50%,
+                rgba(255,255,255,1) 0%,
+                rgba(255,248,200,0.95) 15%,
+                rgba(255,210,80,0.8)  35%,
+                rgba(220,130,20,0.5)  55%,
+                rgba(140,70,0,0.2)    75%,
+                transparent 100%
+            );
+            filter: blur(25px);
+        }
+
+        /* ── Perfectly Scaled Scene Container ── */
+        .gate-scene-wrapper {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 70vw; /* 70:100 aspect ratio matches SVG */
+            max-height: 100vh;
+            max-width: 142.857vh;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #gate-arch-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* ── Gate Doors Clipping Mask ── */
+        #gate-doors-clip {
+            position: absolute;
+            /* Exactly map to the SVG arch inner hole: x=155 to 845, y=10 to 668 */
+            left: 15.5%;
+            top: 1.428%;
+            width: 69%;
+            height: 94%;
+            overflow: hidden; /* Doors disappear perfectly into the pillars when sliding */
+            border-radius: 50% 50% 0 0 / 22% 22% 0 0;
+            pointer-events: all;
+            z-index: 4;
+        }
+
+        /* ── Gate Doors Container ── */
+        #gate-doors {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Left door panel */
+        #door-left {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            will-change: transform;
+            transform-origin: left center;
+            /* Subtle 3D rotation on Y-axis when opening for depth */
+            transition: transform 0.05s linear;
+            box-shadow: inset -8px 0 30px rgba(0,0,0,0.7), 5px 0 20px rgba(0,0,0,0.8);
+        }
+        #door-right {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            will-change: transform;
+            transform-origin: right center;
+            transition: transform 0.05s linear;
+            box-shadow: inset 8px 0 30px rgba(0,0,0,0.7), -5px 0 20px rgba(0,0,0,0.8);
+        }
+        #door-left.snap-open  { transition: transform 2s cubic-bezier(0.22,1,0.36,1); }
+        #door-right.snap-open { transition: transform 2s cubic-bezier(0.22,1,0.36,1); }
+
+        /* Door texture — dark ancient bronze with carved panels */
+        .door-texture {
+            width: 200%; /* Full door width in each half */
+            height: 100%;
+            position: absolute;
+            top: 0;
+        }
+        #door-left  .door-texture { left: 0; }
+        #door-right .door-texture { right: 0; }
+
+        /* Define the door background using SVG-in-CSS for depth and realism */
+        .door-face {
+            position: absolute;
+            inset: 0;
+            background:
+                /* carved panel line detail */
+                repeating-linear-gradient(180deg,
+                    transparent 0px, transparent 22px,
+                    rgba(0,0,0,0.25) 22px, rgba(0,0,0,0.25) 23px,
+                    transparent 23px, transparent 45px
+                ),
+                repeating-linear-gradient(90deg,
+                    transparent 0px, transparent 28px,
+                    rgba(0,0,0,0.15) 28px, rgba(0,0,0,0.15) 29px,
+                    transparent 29px, transparent 58px
+                ),
+                /* Main door gradient — ancient dark stone/iron */
+                linear-gradient(160deg,
+                    #0d1117 0%,
+                    #161b22 8%,
+                    #21262d 18%,
+                    #30363d 28%,
+                    #484f58 40%,
+                    #30363d 52%,
+                    #21262d 64%,
+                    #161b22 76%,
+                    #0d1117 90%,
+                    #010409 100%
+                );
+        }
+        #door-right .door-face {
+            background:
+                repeating-linear-gradient(180deg,
+                    transparent 0px, transparent 22px,
+                    rgba(0,0,0,0.25) 22px, rgba(0,0,0,0.25) 23px,
+                    transparent 23px, transparent 45px
+                ),
+                repeating-linear-gradient(90deg,
+                    transparent 0px, transparent 28px,
+                    rgba(0,0,0,0.15) 28px, rgba(0,0,0,0.15) 29px,
+                    transparent 29px, transparent 58px
+                ),
+                linear-gradient(200deg,
+                    #010409 0%,
+                    #0d1117 10%,
+                    #161b22 24%,
+                    #21262d 36%,
+                    #30363d 48%,
+                    #21262d 60%,
+                    #161b22 72%,
+                    #0d1117 82%,
+                    #080a0c 92%,
+                    #010409 100%
+                );
+        }
+
+        /* SVG ornament overlays on doors */
+        .door-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* The glowing seam between the two doors */
+        #door-seam {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 100%;
+            z-index: 6;
+            pointer-events: none;
+            background: linear-gradient(180deg,
+                transparent 0%,
+                rgba(255,230,100,0.6) 15%,
+                rgba(255,255,200,1) 40%,
+                rgba(255,255,255,1) 50%,
+                rgba(255,255,200,1) 60%,
+                rgba(255,230,100,0.6) 85%,
+                transparent 100%
+            );
+            box-shadow: 0 0 12px 4px rgba(255,230,80,0.9),
+                        0 0 40px 15px rgba(255,180,0,0.5),
+                        0 0 100px 35px rgba(200,100,0,0.2);
+            animation: seamPulse 2.5s ease-in-out infinite;
+        }
+        @keyframes seamPulse {
+            0%,100% { box-shadow: 0 0 12px 4px rgba(255,230,80,0.9), 0 0 40px 15px rgba(255,180,0,0.5), 0 0 100px 35px rgba(200,100,0,0.2); }
+            50%      { box-shadow: 0 0 20px 8px rgba(255,255,120,1.0), 0 0 70px 25px rgba(255,200,0,0.7), 0 0 150px 55px rgba(220,130,0,0.3); }
+        }
+
+        /* Scroll progress overlay canvas */
+        #gate-progress-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 8;
+            pointer-events: none;
+        }
+
+        /* Title text */
+        .portal-ui {
+            position: absolute;
+            bottom: 12%;
+            width: 100%;
+            left: 0;
+            z-index: 9;
+            text-align: center;
+            pointer-events: none;
+        }
+        .portal-title {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: clamp(28px, 5vw, 64px);
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 6px;
+            text-shadow:
+                0 0 30px rgba(255,210,80,0.9),
+                0 0 80px rgba(200,130,0,0.6),
+                0 2px 6px rgba(0,0,0,0.9),
+                0 0 4px #fff;
+            opacity: 0;
+            transform: scale(0.85) translateY(15px);
+            transition: opacity 1.2s ease, transform 1.2s ease;
+            margin-bottom: 10px;
+        }
+        .portal-title.visible {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .portal-subtitle {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(10px, 1.4vw, 16px);
+            color: rgba(255,220,120,0.9);
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(200,130,0,0.8), 0 1px 4px rgba(0,0,0,0.9);
+            opacity: 0;
+            transition: opacity 1s ease 0.6s;
+        }
+        .portal-subtitle.visible { opacity: 1; }
+
+        /* Particle canvas — twinkling stars / dust — sits transparent over background image */
+        #gate-sky-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            mix-blend-mode: screen; /* Additive — adds light, never covers the image */
+        }
+
+        /* Scroll hint */
+        .scroll-hint {
+            position: absolute;
+            bottom: 4%;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            pointer-events: none;
+            z-index: 9;
+        }
+        .scroll-hint.visible { opacity: 1; }
+        .scroll-hint-text {
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            color: rgba(255,220,120,0.9);
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            text-shadow: 0 0 14px rgba(200,130,0,0.9), 0 1px 4px rgba(0,0,0,0.8);
+            white-space: nowrap;
+        }
+        .scroll-wheel-icon {
+            width: 24px; height: 38px;
+            border: 2px solid rgba(255,210,80,0.8);
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 0 12px rgba(255,180,0,0.5);
+        }
+        .scroll-wheel-dot {
+            width: 4px; height: 8px;
+            background: rgba(255,210,80,0.9);
+            border-radius: 2px;
+            position: absolute;
+            left: 50%; transform: translateX(-50%);
+            top: 5px;
+            animation: scrollDot 1.5s ease-in-out infinite;
+        }
+        @keyframes scrollDot {
+            0%   { top: 5px;  opacity: 1; }
+            60%  { top: 20px; opacity: 0.2; }
+            100% { top: 5px;  opacity: 1; }
+        }
+
+        /* Background canvas — stormy sky, clouds, stars */
+        #gate-sky-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* Radiant divine light bursting through the gate crack */
+        #gate-light {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(
+                ellipse 18% 90% at 50% 50%,
+                #fffbe8 0%,
+                #ffd700 12%,
+                #e8860a 28%,
+                #6b3a00 52%,
+                transparent 72%
+            );
+            opacity: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* The gate container – centered, aspect-locked portal arch */
+        #gate-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        #gate-svg-wrap {
+            position: relative;
+            width: min(90vw, 160vh);
+            height: min(100vh, 56vw);
+            flex-shrink: 0;
+        }
+
+        /* Each half of the gate is a positioned element inside the wrap */
+        .gate-half {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 50%;
+            overflow: hidden;
+            will-change: transform;
+            transition: transform 0.05s linear; /* driven by JS during scroll */
+        }
+        .gate-half.snap-open {
+            transition: transform 1.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #gate-left-half  { left: 0; }
+        #gate-right-half { right: 0; }
+
+        /* SVG fills each half */
+        .gate-half svg {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 200%; /* full gate width rendered in each half */
+        }
+        #gate-left-half  svg { left: 0; }
+        #gate-right-half svg { right: 0; }
+
+        /* Light crack between the doors */
+        #gate-crack {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            height: 100%;
+            width: 0px;
+            z-index: 4;
+            pointer-events: none;
+            background: linear-gradient(180deg,
+                rgba(255,240,180,0)   0%,
+                rgba(255,230,100,0.7) 15%,
+                #fff 45%,
+                rgba(255,230,100,0.7) 85%,
+                rgba(255,240,180,0)   100%
+            );
+            filter: blur(2px);
+            box-shadow:
+                0 0 30px 10px rgba(255,220,60,0.8),
+                0 0 80px 30px rgba(255,180,0,0.4),
+                0 0 160px 60px rgba(200,100,0,0.2);
+        }
+
+        /* Scroll progress arc drawn on top canvas */
+        #gate-progress-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* UI text */
+        .portal-ui {
+            position: absolute;
+            bottom: 18%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 6;
+            text-align: center;
+            pointer-events: none;
+            width: 100%;
+        }
+
+        .portal-title {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: clamp(28px,5vw,60px);
+            font-weight: 900;
+            color: #fff9e6;
+            letter-spacing: 6px;
+            text-shadow:
+                0 0 20px #ffd700,
+                0 0 60px #21262d,
+                0 0 4px #fff;
+            opacity: 0;
+            transform: scale(0.7) translateY(20px);
+            transition: opacity 1s ease, transform 1s ease;
+            margin-bottom: 10px;
+        }
+        .portal-title.visible {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .portal-subtitle {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(11px,1.5vw,18px);
+            color: #ffd700;
+            letter-spacing: 10px;
+            text-transform: uppercase;
+            text-shadow: 0 0 15px #21262d;
+            opacity: 0;
+            transition: opacity 0.8s ease 0.5s;
+        }
+        .portal-subtitle.visible { opacity: 1; }
+
+        /* Scroll hint */
+        .scroll-hint {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            pointer-events: none;
+            z-index: 6;
+        }
+        .scroll-hint.visible { opacity: 1; }
+        .scroll-hint-text {
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            color: #ffd700;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            text-shadow: 0 0 12px #21262d;
+            white-space: nowrap;
+        }
+        .scroll-wheel-icon {
+            width: 24px; height: 38px;
+            border: 2px solid #ffd700;
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 0 10px rgba(255,180,0,0.5);
+        }
+        .scroll-wheel-dot {
+            width: 4px; height: 8px;
+            background: #ffd700;
+            border-radius: 2px;
+            position: absolute;
+            left: 50%; transform: translateX(-50%);
+            top: 5px;
+            animation: scrollDot 1.5s ease-in-out infinite;
+        }
+        @keyframes scrollDot {
+            0%   { top: 5px;  opacity: 1; }
+            60%  { top: 20px; opacity: 0.2; }
+            100% { top: 5px;  opacity: 1; }
+        }
+
+        /* ── Color Picker Overlay — Chess World Kingdom ── */
+        #color-picker {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            background-image: url('chess_world_bg.png');
+            background-size: cover;
+            background-position: center top;
+            background-repeat: no-repeat;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            overflow: hidden;
+            padding: 28px 0 0;
+            gap: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s ease;
+        }
+
+        /* Dark gradient overlay so text is readable over the image */
+        #color-picker::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(to bottom,
+                    rgba(0, 0, 0, 0.72) 0%,
+                    rgba(5, 0, 20, 0.55) 40%,
+                    rgba(5, 0, 20, 0.70) 70%,
+                    rgba(0, 0, 0, 0.88) 100%);
+            z-index: 0;
+        }
+
+        #color-picker.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .picker-heading {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: 38px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 4px;
+            text-align: center;
+            text-shadow: 0 0 20px #00f5ff, 0 0 50px #7b2fff;
+            margin: 0 0 8px 0;
+        }
+
+        .picker-sub {
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            color: #a78bfa;
+            letter-spacing: 6px;
+            text-align: center;
+            margin: 0 0 22px 0;
+            text-shadow: 0 0 12px #7b2fff;
+        }
+
+        .picker-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Glassy title banner */
+        .picker-heading {
+            text-shadow:
+                0 0 20px #ffd700,
+                0 0 50px #b8860b,
+                0 0 4px #fff;
+            color: #ffd700 !important;
+        }
+
+        .picker-boxes {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .piece-box {
+            width: 210px;
+            padding: 30px 20px 24px;
+            border-radius: 18px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            position: relative;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+            user-select: none;
+        }
+
+        /* White box */
+        .piece-box.white-box {
+            background: linear-gradient(145deg, #e8eaf0, #c9d2db);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 30px rgba(200, 220, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .piece-box.white-box:hover {
+            transform: translateY(-10px) scale(1.04);
+            box-shadow: 0 0 60px rgba(0, 245, 255, 0.6), 0 0 120px rgba(0, 245, 255, 0.2);
+        }
+
+        /* Black box */
+        .piece-box.dark-box {
+            background: linear-gradient(145deg, #1a1a2e, #0d0d1a);
+            border: 3px solid rgba(123, 47, 255, 0.6);
+            box-shadow: 0 0 30px rgba(123, 47, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .piece-box.dark-box:hover {
+            transform: translateY(-10px) scale(1.04);
+            box-shadow: 0 0 60px rgba(123, 47, 255, 0.7), 0 0 120px rgba(123, 47, 255, 0.3);
+        }
+
+        .pieces-row {
+            font-size: 46px;
+            line-height: 1.1;
+            letter-spacing: 4px;
+            color: #1a1a1a;
+        }
+
+        .pieces-row.dark-pieces {
+            color: #f0f0ff;
+            text-shadow: 0 0 10px rgba(123, 47, 255, 0.5);
+        }
+
+        .box-label {
+            font-family: 'Cinzel', serif;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 6px;
+            color: #333;
+            margin-top: 4px;
+        }
+
+        .box-label.dark-label {
+            color: #c4b5fd;
+            text-shadow: 0 0 10px #7b2fff;
+        }
+
+        .vs-divider {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: 28px;
+            color: #ff4fd8;
+            text-shadow: 0 0 20px #ff00cc, 0 0 40px #ff00cc;
+            font-weight: 900;
+        }
+
+        /* chosen flash */
+        .piece-box.chosen {
+            animation: chosenFlash 0.45s ease forwards;
+        }
+
+        @keyframes chosenFlash {
+            0% {
+                transform: scale(1);
+            }
+
+            40% {
+                transform: scale(1.18);
+                filter: brightness(2.5);
+            }
+
+            100% {
+                transform: scale(0.0);
+                opacity: 0;
+            }
+        }
+
+        /* ── Disney World Chess — Floating Background Pieces ── */
+        .bg-pieces {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-piece {
+            position: absolute;
+            font-size: 110px;
+            opacity: 0.055;
+            color: #ffd700;
+            text-shadow: 0 0 60px #ffd700;
+            animation: floatPiece var(--dur, 12s) ease-in-out infinite;
+            animation-delay: var(--delay, 0s);
+            user-select: none;
+        }
+
+        @keyframes floatPiece {
+            0% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+
+            33% {
+                transform: translateY(-28px) rotate(6deg) scale(1.06);
+            }
+
+            66% {
+                transform: translateY(14px) rotate(-4deg) scale(0.94);
+            }
+
+            100% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+        }
+
+        /* Twinkling star dots generated by JS */
+        .star-dot {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: twinkle var(--tw, 2s) ease-in-out infinite;
+            animation-delay: var(--td, 0s);
+        }
+
+        @keyframes twinkle {
+
+            0%,
+            100% {
+                opacity: 0.08;
+                transform: scale(0.7);
+            }
+
+            50% {
+                opacity: 0.9;
+                transform: scale(1.4);
+            }
+        }
+
+        /* ── Hall of Chess Legends ── */
+        .masters-section {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            margin-top: 32px;
+        }
+
+        .masters-title {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: 13px;
+            text-align: center;
+            color: #ffd700;
+            letter-spacing: 10px;
+            text-shadow: 0 0 16px #ffd700, 0 0 32px #b8860b;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+        }
+
+        .masters-track-wrapper {
+            overflow: hidden;
+            width: 100%;
+            mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+        }
+
+        .masters-track {
+            display: flex;
+            gap: 40px;
+            /* Wider gap for cutouts */
+            width: max-content;
+            animation: scrollMasters 38s linear infinite;
+            padding: 20px 0 35px;
+            /* Leave room for pop-up effect */
+        }
+
+        .masters-track:hover {
+            animation-play-state: paused;
+        }
+
+        @keyframes scrollMasters {
+            0% {
+                transform: translateX(0);
+            }
+
+            100% {
+                transform: translateX(-50%);
+            }
+        }
+
+        /* ── Standout Cutoff Design ── */
+        .master-cutout {
+            width: 190px;
+            height: 250px;
+            position: relative;
+            flex-shrink: 0;
+            cursor: default;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .master-cutout:hover {
+            transform: translateY(-20px) scale(1.12);
+        }
+
+        .cutout-img-wrapper {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            /* Creates the smooth fading out at the bottom like a cutout bust */
+            -webkit-mask-image: radial-gradient(ellipse 110% 100% at 50% 30%, black 40%, transparent 100%);
+            mask-image: radial-gradient(ellipse 110% 100% at 50% 30%, black 40%, transparent 100%);
+        }
+
+        .cutout-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center top;
+            /* Make it look like a dramatic phantom cutout against the golden castle */
+            filter: contrast(1.15) brightness(0.95);
+            opacity: 0.85;
+            transition: filter 0.4s ease, opacity 0.4s ease;
+        }
+
+        .master-cutout:hover .cutout-img {
+            filter: contrast(1.25) brightness(1.15);
+            opacity: 1;
+        }
+
+        /* Large name spanning across the cutout */
+        .cutout-name-overlay {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 140%;
+            /* allows text to spill out of the bounds */
+            text-align: center;
+            font-family: 'Cinzel Decorative', serif;
+            font-size: 34px;
+            font-weight: 900;
+            line-height: 0.85;
+            text-transform: uppercase;
+            /* Heavy text shadow to pop against the image */
+            text-shadow: 0 8px 30px rgba(0, 0, 0, 0.95), 0 2px 5px rgba(0, 0, 0, 0.8), 0 0 15px var(--theme-color, #ffd700);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .cutout-name-first {
+            font-size: 16px;
+            display: block;
+            margin-bottom: 2px;
+            color: #f8fafc;
+            letter-spacing: 2px;
+        }
+
+        .cutout-name-last {
+            display: block;
+            color: var(--theme-color, #ffd700);
+            letter-spacing: 1px;
+        }
+
+        /* Subtle info at the bottom of the cutout */
+        .cutout-fade-info {
+            position: absolute;
+            bottom: -25px;
+            width: 120%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .master-cutout:hover .cutout-fade-info {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .cutout-badge {
+            font-family: 'Cinzel', serif;
+            color: var(--theme-color, #ffd700);
+            font-size: 10px;
+            letter-spacing: 3px;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+        }
+
+        .cutout-quote {
+            font-family: 'Georgia', serif;
+            font-style: italic;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.85);
+            padding: 0 10px;
+            text-shadow: 0 2px 6px #000;
+            line-height: 1.35;
+        }
+
+        /* ── Game board hidden until color chosen ── */
+        #game-board-container {
+            display: none;
+        }
+
+        /* ── Chess Board Styles ── */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Layout Containers */
+        .game-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 40px;
+            margin-top: 20px;
+        }
+
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .board-container {
+            padding: 15px;
+            background-color: #0b9ebb;
+            border: 8px solid #1a7185;
+            border-bottom-color: #0d4654;
+            border-right-color: #0d4654;
+            border-top-color: #3bbcd6;
+            border-left-color: #3bbcd6;
+            display: inline-block;
+            box-shadow: 2px 5px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .chess-board {
+            border-spacing: 0;
+            border-collapse: collapse;
+            border: 2px solid #0d4654;
+        }
+
+        .chess-board td {
+            width: 80px;
+            height: 80px;
+            text-align: center;
+            vertical-align: middle;
+            padding: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .chess-board .light {
+            background-color: #c9d2db;
+        }
+
+        .chess-board .dark {
+            background-color: #71a9b9;
+        }
+
+        .chess-board .selected {
+            background-color: #aaffaa !important;
+        }
+
+        .chess-board .valid-move {
+            background-color: #ffcccc !important;
+        }
+
+        /* Sidebar & Status */
+        .turn-indicator {
+            font-size: 32px;
+            font-weight: bold;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .capture-box {
+            width: 280px;
+            height: 120px;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            border: 1px solid #ccc;
+        }
+
+        .capture-box-header {
+            padding: 8px;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .white-captures .capture-box-header {
+            background-color: #e2e8f0;
+            color: #1a202c;
+            border-bottom: 1px solid #cbd5e1;
+        }
+
+        .black-captures .capture-box-header {
+            background-color: #1a202c;
+            color: #f7fafc;
+            border-bottom: 1px solid #000;
+        }
+
+        .capture-area {
+            padding: 10px;
+            font-size: 32px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        /* Checkmate Game Over Screen Styles */
+        #game-over-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: red;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        #game-over-screen h1 {
+            font-size: 100px;
+            margin: 0;
+            animation: pulse 1s infinite alternate;
+        }
+
+        #game-over-screen h2 {
+            font-size: 60px;
+            color: white;
+            margin-top: 20px;
+        }
+
+        @keyframes pulse {
+            from {
+                transform: scale(1);
+            }
+
+            to {
+                transform: scale(1.1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ══ NORSE GATE PORTAL SCREEN ══ -->
+    <div id="portal-screen">
+
+        <!-- Norse realm background artwork -->
+        <div id="portal-bg"></div>
+
+        <!-- Twinkling dust / star particles canvas -->
+        <canvas id="gate-sky-canvas"></canvas>
+
+        <!-- Blinding light burst and gate are bundled in a perfectly scaled wrapper -->
+        <div class="gate-scene-wrapper">
+
+            <div id="gate-burst"></div>
+
+            <!-- ── Gate Doors Mask Container ── -->
+            <div id="gate-doors-clip">
+        <div id="gate-doors">
+
+            <!-- LEFT door panel -->
+            <div id="door-left">
+                <div class="door-texture">
+                    <div class="door-face"></div>
+                    <!-- SVG ornaments ON the door -->
+                    <svg class="door-svg" viewBox="0 0 300 560" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <filter id="runeGlow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        </defs>
+                        <!-- Top panel: Yggdrasil Tree of Life -->
+                        <rect x="20" y="20" width="260" height="165" rx="4" fill="rgba(0,0,0,0.3)" stroke="#21262d" stroke-width="1.5"/>
+                        <g transform="translate(150,100)" filter="url(#runeGlow)">
+                            <!-- Tree trunk -->
+                            <line x1="0" y1="-60" x2="0" y2="42" stroke="#161b22" stroke-width="7" stroke-linecap="round"/>
+                            <!-- Roots -->
+                            <path d="M0,42 Q-28,58 -55,72" stroke="#161b22" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                            <path d="M0,42 Q28,58 55,72" stroke="#161b22" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                            <path d="M0,55 Q0,68 0,80" stroke="#161b22" stroke-width="3" fill="none"/>
+                            <!-- Main branches -->
+                            <path d="M0,-18 Q-26,-38 -52,-55" stroke="#21262d" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <path d="M0,-18 Q26,-38 52,-55" stroke="#21262d" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <path d="M0,-36 Q-14,-54 -28,-68" stroke="#21262d" stroke-width="2" fill="none" stroke-linecap="round"/>
+                            <path d="M0,-36 Q14,-54 28,-68" stroke="#21262d" stroke-width="2" fill="none" stroke-linecap="round"/>
+                            <!-- Upper branch tips -->
+                            <path d="M-52,-55 Q-60,-62 -56,-72" stroke="#ffd700" stroke-width="1.5" fill="none" opacity="0.4"/>
+                            <path d="M52,-55 Q60,-62 56,-72" stroke="#ffd700" stroke-width="1.5" fill="none" opacity="0.4"/>
+                            <!-- Foliage clusters -->
+                            <circle cx="-52" cy="-58" r="16" fill="none" stroke="#ffd700" stroke-width="1.5" opacity="0.3"/>
+                            <circle cx="52" cy="-58" r="16" fill="none" stroke="#ffd700" stroke-width="1.5" opacity="0.3"/>
+                            <circle cx="0" cy="-73" r="20" fill="none" stroke="#ffd700" stroke-width="2" opacity="0.4"/>
+                            <circle cx="-28" cy="-70" r="10" fill="none" stroke="#21262d" stroke-width="1" opacity="0.6"/>
+                            <circle cx="28" cy="-70" r="10" fill="none" stroke="#21262d" stroke-width="1" opacity="0.6"/>
+                        </g>
+                        <!-- Middle panel: Left half of compass/sun wheel -->
+                        <rect x="20" y="200" width="260" height="165" rx="4" fill="rgba(0,0,0,0.3)" stroke="#21262d" stroke-width="1.5"/>
+                        <g transform="translate(300,282)" filter="url(#runeGlow)">
+                            <!-- Wheel outer rings -->
+                            <circle cx="0" cy="0" r="74" fill="none" stroke="#21262d" stroke-width="3" opacity="0.9"/>
+                            <circle cx="0" cy="0" r="68" fill="none" stroke="#ffd700" stroke-width="1" stroke-dasharray="5,4" opacity="0.25"/>
+                            <!-- Rune band ring -->
+                            <circle cx="0" cy="0" r="60" fill="rgba(0,0,0,0.3)" stroke="#161b22" stroke-width="10" opacity="0.5"/>
+                            <!-- 8-point star rays (left half only) -->
+                            <line x1="0" y1="0" x2="-72" y2="0"  stroke="#ffd700" stroke-width="4" opacity="0.35"/>
+                            <line x1="0" y1="0" x2="-51" y2="-51" stroke="#ffd700" stroke-width="2.5" opacity="0.25"/>
+                            <line x1="0" y1="0" x2="0"  y2="-72" stroke="#ffd700" stroke-width="4" opacity="0.35"/>
+                            <line x1="0" y1="0" x2="-51" y2="51" stroke="#ffd700" stroke-width="2.5" opacity="0.25"/>
+                            <line x1="0" y1="0" x2="0"  y2="72"  stroke="#ffd700" stroke-width="4" opacity="0.35"/>
+                            <!-- Inner glow at center (seam side) -->
+                            <circle cx="0" cy="0" r="22" fill="#21262d" opacity="0.4"/>
+                            <circle cx="0" cy="0" r="12" fill="#ffd700" opacity="0.25"/>
+                        </g>
+                        <!-- Bottom panel: Valknut -->
+                        <rect x="20" y="380" width="260" height="155" rx="4" fill="rgba(0,0,0,0.3)" stroke="#21262d" stroke-width="1.5"/>
+                        <g transform="translate(150,455)" fill="none" stroke="#ffd700" stroke-width="2.5" opacity="0.35" filter="url(#runeGlow)">
+                            <polygon points="0,-42 -36,21 36,21"/>
+                            <polygon points="0,-29 -25,14 25,14" transform="rotate(32)"/>
+                            <polygon points="0,-29 -25,14 25,14" transform="rotate(-32)"/>
+                            <circle cx="0" cy="0" r="54" stroke-width="1.5" opacity="0.2"/>
+                        </g>
+                        <!-- Dragon serpent along bottom -->
+                        <path d="M30,528 Q65,505 100,528 Q135,551 170,528 Q205,505 240,528 Q265,515 280,528" fill="none" stroke="#21262d" stroke-width="2" opacity="0.8"/>
+                        <!-- Right edge highlight strip (seam side glow) -->
+                        <rect x="292" y="0" width="8" height="560" fill="rgba(100,120,150,0.08)"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- RIGHT door panel -->
+            <div id="door-right">
+                <div class="door-texture">
+                    <div class="door-face"></div>
+                    <svg class="door-svg" viewBox="0 0 300 560" xmlns="http://www.w3.org/2000/svg" style="right:0;left:auto">
+                        <defs>
+                            <filter id="runeGlow2"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        </defs>
+                        <!-- Top panel: Valknut (mirror) -->
+                        <rect x="20" y="20" width="260" height="165" rx="4" fill="rgba(0,0,0,0.3)" stroke="#21262d" stroke-width="1.5"/>
+                        <g transform="translate(150,100)" fill="none" stroke="#ffd700" stroke-width="2.5" opacity="0.35" filter="url(#runeGlow2)">
+                            <polygon points="0,-52 -45,26 45,26"/>
+                            <polygon points="0,-36 -31,18 31,18" transform="rotate(32)"/>
+                            <polygon points="0,-36 -31,18 31,18" transform="rotate(-32)"/>
+                            <circle cx="0" cy="0" r="66" stroke-width="1.5" opacity="0.2"/>
+                        </g>
+                        <!-- Middle panel: Right half of compass/sun wheel -->
+                        <rect x="20" y="200" width="260" height="165" rx="4" fill="rgba(0,0,0,0.3)" stroke="#21262d" stroke-width="1.5"/>
+                        <g transform="translate(0,282)" filter="url(#runeGlow2)">
+                            <circle cx="0" cy="0" r="74" fill="none" stroke="#21262d" stroke-width="3" opacity="0.9"/>
+                            <circle cx="0" cy="0" r="68" fill="none" stroke="#ffd700" stroke-width="1" stroke-dasharray="5,4" opacity="0.25"/>
+                            <circle cx="0" cy="0" r="60" fill="rgba(0,0,0,0.3)" stroke="#161b22" stroke-width="10" opacity="0.5"/>
+                            <!-- Right half rays -->
+                            <line x1="0" y1="0" x2="72" y2="0"  stroke="#ffd700" stroke-width="4" opacity="0.35"/>
+                            <line x1="0" y1="0" x2="51" y2="-51" stroke="#ffd700" stroke-width="2.5" opacity="0.25"/>
+                            <line x1="0" y1="0" x2="0"  y2="-72" stroke="#ffd700" stroke-width="4" opacity="0.35"/>
+                            <line x1="0" y1="0" x2="51" y2="51" stroke="#ffd700" stroke-width="2.5" opacity="0.25"/>
+                            <line x1="0" y1="0" x2="0"  y2="72"  stroke="#ffd700" stroke-width="4" opacity="0.35"/>
+                            <!-- Glowing center -->
+                            <circle cx="0" cy="0" r="22" fill="#21262d" opacity="0.4"/>
+                            <circle cx="0" cy="0" r="12" fill="#ffd700" opacity="0.25" filter="url(#runeGlow2)"/>
+                        </g>
+                        <!-- Bottom panel: Dragon carvings -->
+                        <rect x="20" y="380" width="260" height="155" rx="4" fill="rgba(0,0,0,0.3)" stroke="#21262d" stroke-width="1.5"/>
+                        <g transform="translate(150,455)" fill="none" stroke="#ffd700" stroke-width="2.5" opacity="0.35" filter="url(#runeGlow2)">
+                            <polygon points="0,-42 -36,21 36,21"/>
+                            <polygon points="0,-29 -25,14 25,14" transform="rotate(32)"/>
+                            <polygon points="0,-29 -25,14 25,14" transform="rotate(-32)"/>
+                            <circle cx="0" cy="0" r="54" stroke-width="1.5" opacity="0.2"/>
+                        </g>
+                        <path d="M20,528 Q55,505 90,528 Q125,551 160,528 Q195,505 230,528 Q255,515 270,528" fill="none" stroke="#21262d" stroke-width="2" opacity="0.8"/>
+                        <!-- Left edge highlight strip -->
+                        <rect x="0" y="0" width="8" height="560" fill="rgba(100,120,150,0.08)"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Glowing seam between doors -->
+            <div id="door-seam"></div>
+        </div>
+
+            </div>
+
+            <!-- ── Stone Arch Frame SVG ── -->
+            <svg id="gate-arch-svg" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <!-- Stone texture gradient for arch -->
+                    <linearGradient id="archGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%"   stop-color="#010409"/>
+                        <stop offset="8%"   stop-color="#0d1117"/>
+                        <stop offset="18%"  stop-color="#161b22"/>
+                        <stop offset="28%"  stop-color="#21262d"/>
+                        <stop offset="38%"  stop-color="#30363d" />
+                        <stop offset="50%"  stop-color="#484f58"/>
+                        <stop offset="62%"  stop-color="#30363d"/>
+                        <stop offset="72%"  stop-color="#21262d"/>
+                        <stop offset="82%"  stop-color="#161b22"/>
+                        <stop offset="92%"  stop-color="#0d1117"/>
+                        <stop offset="100%" stop-color="#010409"/>
+                    </linearGradient>
+                    <linearGradient id="pillarGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%"   stop-color="#010409"/>
+                        <stop offset="25%"  stop-color="#161b22"/>
+                        <stop offset="50%"  stop-color="#30363d"/>
+                        <stop offset="75%"  stop-color="#161b22"/>
+                        <stop offset="100%" stop-color="#010409"/>
+                    </linearGradient>
+                    <filter id="archShadow" x="-5%" y="-5%" width="110%" height="110%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgba(0,0,0,0.9)"/>
+                    </filter>
+                    <filter id="goldGlow">
+                        <feGaussianBlur stdDeviation="3" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                </defs>
+
+                <!-- ── Left flanking pillar column ── -->
+                <!-- Regular pillar -->
+                <rect x="0" y="0" width="155" height="700" fill="url(#pillarGrad)" filter="url(#archShadow)"/>
+                <!-- Pillar detail lines -->
+                <line x1="18" y1="0" x2="18" y2="700" stroke="#30363d" stroke-width="1.5" opacity="0.6"/>
+                <line x1="40" y1="0" x2="40" y2="700" stroke="#21262d" stroke-width="1" opacity="0.5"/>
+                <line x1="115" y1="0" x2="115" y2="700" stroke="#21262d" stroke-width="1" opacity="0.5"/>
+                <line x1="137" y1="0" x2="137" y2="700" stroke="#30363d" stroke-width="1.5" opacity="0.6"/>
+                <!-- Pillar capital top -->
+                <rect x="0" y="0" width="155" height="30" fill="#0d1117" opacity="0.9"/>
+                <line x1="0" y1="30" x2="155" y2="30" stroke="#ffd700" stroke-width="2" opacity="0.25"/>
+
+                <!-- ── Right flanking pillar column ── -->
+                <!-- Regular pillar -->
+                <rect x="845" y="0" width="155" height="700" fill="url(#pillarGrad)" filter="url(#archShadow)"/>
+                <line x1="863" y1="0" x2="863" y2="700" stroke="#30363d" stroke-width="1.5" opacity="0.6"/>
+                <line x1="885" y1="0" x2="885" y2="700" stroke="#21262d" stroke-width="1" opacity="0.5"/>
+                <line x1="960" y1="0" x2="960" y2="700" stroke="#21262d" stroke-width="1" opacity="0.5"/>
+                <line x1="982" y1="0" x2="982" y2="700" stroke="#30363d" stroke-width="1.5" opacity="0.6"/>
+                <rect x="845" y="0" width="155" height="30" fill="#0d1117" opacity="0.9"/>
+                <line x1="845" y1="30" x2="1000" y2="30" stroke="#ffd700" stroke-width="2" opacity="0.25"/>
+
+                <!-- ── Stone Arch border (top arch shape) ── -->
+                <!-- Left arch wall -->
+                <path d="M 155,700 L 155,190 Q 155,60 355,30 L 500,30 L 500,10 L 320,10 Q 100,45 100,190 L 100,700 Z"
+                      fill="url(#archGrad)" filter="url(#archShadow)"/>
+                <!-- Right arch wall -->
+                <path d="M 845,700 L 845,190 Q 845,60 645,30 L 500,30 L 500,10 L 680,10 Q 900,45 900,190 L 900,700 Z"
+                      fill="url(#archGrad)" filter="url(#archShadow)"/>
+
+                <!-- Arch keystone at top -->
+                <path d="M 420,10 Q 420,0 500,0 Q 580,0 580,10 L 560,40 Q 520,28 500,28 Q 480,28 440,40 Z"
+                      fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+
+                <!-- Rune inscription around arch border -->
+                <!-- Left arch rune strip -->
+                <text font-size="13" fill="#ffd700" opacity="0.65" font-family="serif" filter="url(#goldGlow)">
+                    <!-- Left column runes going down -->
+                    <textPath href="#archCurveL">ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗ</textPath>
+                </text>
+                <text font-size="13" fill="#ffd700" opacity="0.65" font-family="serif" filter="url(#goldGlow)">
+                    <textPath href="#archCurveR">ᛚᛜᛞᛟᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊ</textPath>
+                </text>
+
+                <!-- Define the arch curve paths for text -->
+                <defs>
+                    <path id="archCurveL" d="M 180,680 L 180,200 Q 182,80 340,48"/>
+                    <path id="archCurveR" d="M 820,680 L 820,200 Q 818,80 660,48"/>
+                </defs>
+
+                <!-- ── Gold trim lines on arch inner edge ── -->
+                <path d="M 178,680 L 178,195 Q 178,65 355,38" fill="none" stroke="#ffd700" stroke-width="2" opacity="0.25"/>
+                <path d="M 822,680 L 822,195 Q 822,65 645,38" fill="none" stroke="#ffd700" stroke-width="2" opacity="0.25"/>
+                <!-- Top arch gold trim -->
+                <path d="M 355,38 Q 428,18 500,16 Q 572,18 645,38" fill="none" stroke="#ffd700" stroke-width="2" opacity="0.25"/>
+
+                <!-- Bottom stone ground slab -->
+                <rect x="-100" y="668" width="1200" height="200" fill="#0d1117" opacity="0.95"/>
+                <line x1="-100" y1="668" x2="1100" y2="668" stroke="#30363d" stroke-width="2" opacity="0.8"/>
+                <!-- Ground runes -->
+                <text x="500" y="688" text-anchor="middle" font-size="10" fill="#ffd700" opacity="0.35" font-family="serif" letter-spacing="12">ᚠᚱᚺᚾᛁᚷᚹᛒᛏᚠᚱ</text>
+            </svg>
+        </div>
+        <!-- Scroll progress arc canvas -->
+        <canvas id="gate-progress-canvas"></canvas>
+
+        <!-- Title text -->
+        <div class="portal-ui">
+            <div class="portal-title" id="portal-title">CHESS WORLD</div>
+            <div class="portal-subtitle" id="portal-subtitle">Enter the Realm</div>
+        </div>
+
+        <!-- Scroll hint -->
+        <div class="scroll-hint" id="scroll-hint">
+            <div class="scroll-hint-text">↓ Scroll to Open the Gate ↓</div>
+            <div class="scroll-wheel-icon"><div class="scroll-wheel-dot"></div></div>
+        </div>
+
+    </div>
+
+
+
+    <!-- ── Color Picker Overlay — Disney World Chess ── -->
+    <div id="color-picker">
+
+        <!-- Floating background chess pieces -->
+        <div class="bg-pieces" aria-hidden="true">
+            <span class="bg-piece" style="top:8%;left:5%;--dur:14s;--delay:0s">♛</span>
+            <span class="bg-piece" style="top:60%;left:2%;--dur:11s;--delay:1s">♞</span>
+            <span class="bg-piece" style="top:20%;left:88%;--dur:13s;--delay:2s">♜</span>
+            <span class="bg-piece" style="top:72%;left:85%;--dur:10s;--delay:0.5s">♝</span>
+            <span class="bg-piece" style="top:42%;left:50%;--dur:16s;--delay:3s;font-size:200px;opacity:0.03">♚</span>
+            <span class="bg-piece" style="top:5%;left:45%;--dur:9s;--delay:1.5s">♟</span>
+            <span class="bg-piece" style="top:80%;left:40%;--dur:12s;--delay:2.5s">♕</span>
+            <span class="bg-piece" style="top:50%;left:92%;--dur:15s;--delay:0.8s">♘</span>
+        </div>
+
+        <!-- Twinkling stars — populated by JS -->
+        <div id="picker-stars" style="position:absolute;inset:0;pointer-events:none;z-index:0;"></div>
+
+        <!-- Picker content -->
+        <div class="picker-content">
+            <h2 class="picker-heading">Choose Your Side</h2>
+            <p class="picker-sub">Select the color you wish to command</p>
+            <div class="picker-boxes">
+                <div class="piece-box white-box" id="pick-white">
+                    <div class="pieces-row">♔ ♕ ♖</div>
+                    <div class="pieces-row">♗ ♘ ♙</div>
+                    <div class="box-label">WHITE</div>
+                </div>
+                <div class="vs-divider">VS</div>
+                <div class="piece-box dark-box" id="pick-black">
+                    <div class="pieces-row dark-pieces">♚ ♛ ♜</div>
+                    <div class="pieces-row dark-pieces">♝ ♞ ♟</div>
+                    <div class="box-label dark-label">BLACK</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hall of Chess Legends -->
+        <div class="masters-section">
+            <div class="masters-title">✦ Hall of Chess Legends ✦</div>
+            <div class="masters-track-wrapper">
+                <div class="masters-track" id="masters-track"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Chess Board (hidden until color chosen) ── -->
+    <div id="game-board-container">
+        <div class="header-container">
+            <h1>MASTER'S CHESS-BOARD</h1>
+            <span class="turn-indicator" id="turn-indicator">- White's Turn</span>
+        </div>
+
+        <div class="game-wrapper">
+            <div class="board-container">
+                <table class="chess-board">
+                    <tbody id="board">
+                        <!-- Board will be generated here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="sidebar">
+                <div class="capture-box white-captures">
+                    <div class="capture-box-header">WHITE PIECES CAPTURED</div>
+                    <div class="capture-area" id="white-captured-area"></div>
+                </div>
+
+                <div class="capture-box black-captures">
+                    <div class="capture-box-header">BLACK PIECES CAPTURED</div>
+                    <div class="capture-area" id="black-captured-area"></div>
+                </div>
+            </div>
+        </div><!-- end .game-wrapper -->
+
+    </div><!-- end #game-board-container -->
+
+    <div id="game-over-screen">
+        <h1 id="checkmate-text">CHECKMATE!</h1>
+        <h2 id="winner-text"></h2>
+    </div>
+
+    <!-- Integrate chess.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+    <!-- ── Norse Gate Opening Animation ── -->
+    <script>
+        (function () {
+            const portalScreen  = document.getElementById('portal-screen');
+            const gateBurst     = document.getElementById('gate-burst');
+            const titleEl       = document.getElementById('portal-title');
+            const subEl         = document.getElementById('portal-subtitle');
+            const scrollHint    = document.getElementById('scroll-hint');
+            const doorLeft      = document.getElementById('door-left');
+            const doorRight     = document.getElementById('door-right');
+            const doorSeam      = document.getElementById('door-seam');
+            const colorPicker   = document.getElementById('color-picker');
+            const pickWhite     = document.getElementById('pick-white');
+            const pickBlack     = document.getElementById('pick-black');
+
+            // ─── Twinkling mote particles canvas ───────────────────────────────────
+            const skyCanvas = document.getElementById('gate-sky-canvas');
+            const skyCtx = skyCanvas.getContext('2d');
+            let SW, SH;
+
+            function resizeSky() {
+                SW = skyCanvas.width  = window.innerWidth;
+                SH = skyCanvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeSky);
+            resizeSky();
+
+
+            // Floating dust motes / golden snow particles
+            const motes = [];
+            for (let i = 0; i < 140; i++) {
+                motes.push({
+                    x: Math.random(),
+                    y: Math.random(),
+                    r: 0.5 + Math.random() * 2.0,
+                    a: Math.random(),
+                    da: (Math.random() - 0.5) * 0.008,
+                    dy: -0.00008 - Math.random() * 0.00012,
+                    gold: Math.random() > 0.55
+                });
+            }
+
+            let skyT = 0;
+            function drawSky() {
+                skyT += 0.004;
+
+                // Clear to fully transparent — background image shows through
+                skyCtx.clearRect(0, 0, SW, SH);
+
+                // Atmospheric god-ray columns from top center
+                // (screen blend mode means these add warm golden light over the photo)
+                for (let i = 0; i < 7; i++) {
+                    const angle = (-0.3 + i * 0.1) + Math.sin(skyT * 0.3 + i) * 0.03;
+                    const x1 = SW * 0.5 + Math.sin(angle) * 60;
+                    const rayGrad = skyCtx.createLinearGradient(x1, 0, SW * 0.5 + Math.sin(angle) * SH * 0.6, SH * 0.7);
+                    const alpha = (0.04 + 0.02 * Math.sin(skyT + i)) * (1 + scrollFrac * 3);
+                    rayGrad.addColorStop(0, `rgba(255,200,80,${alpha})`);
+                    rayGrad.addColorStop(1, 'rgba(255,180,0,0)');
+                    skyCtx.beginPath();
+                    skyCtx.moveTo(x1, 0);
+                    skyCtx.lineTo(SW * 0.5 + Math.sin(angle) * SH * 1.2, SH);
+                    skyCtx.lineWidth = 35 + i * 15;
+                    skyCtx.strokeStyle = rayGrad;
+                    skyCtx.stroke();
+                }
+
+                // Twinkling gold & white motes (floating dust / snow)
+                motes.forEach(m => {
+                    m.y += m.dy;
+                    m.a += m.da;
+                    if (m.a > 1) { m.a = 1; m.da *= -1; }
+                    if (m.a < 0) { m.a = 0; m.da *= -1; }
+                    if (m.y < -0.01) m.y = 1.01;
+                    const alpha = m.a * 0.85;
+                    skyCtx.beginPath();
+                    skyCtx.arc(m.x * SW, m.y * SH, m.r, 0, Math.PI * 2);
+                    skyCtx.fillStyle = m.gold
+                        ? `rgba(255,220,100,${alpha})`
+                        : `rgba(240,240,255,${alpha * 0.8})`;
+                    skyCtx.fill();
+                });
+
+                // Growing center glow as gate opens (light pouring through)
+                if (scrollFrac > 0.02) {
+                    const glowR = Math.min(SW, SH) * (0.05 + scrollFrac * 0.45);
+                    const glowA = scrollFrac * 0.9;
+                    const g = skyCtx.createRadialGradient(SW/2, SH/2, 0, SW/2, SH/2, glowR);
+                    g.addColorStop(0,   `rgba(255,250,200,${glowA})`);
+                    g.addColorStop(0.2, `rgba(255,210,80,${glowA * 0.7})`);
+                    g.addColorStop(0.5, `rgba(220,140,0,${glowA * 0.3})`);
+                    g.addColorStop(1,   'rgba(0,0,0,0)');
+                    skyCtx.beginPath();
+                    skyCtx.arc(SW/2, SH/2, glowR, 0, Math.PI * 2);
+                    skyCtx.fillStyle = g;
+                    skyCtx.fill();
+                }
+            }
+
+            // ─── Progress arc canvas ────────────────────────────────────────
+            const arcCanvas = document.getElementById('gate-progress-canvas');
+            const arcCtx = arcCanvas.getContext('2d');
+            let AW, AH;
+            function resizeArc() {
+                AW = arcCanvas.width  = window.innerWidth;
+                AH = arcCanvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeArc);
+            resizeArc();
+
+            function drawProgressArc() {
+                arcCtx.clearRect(0, 0, AW, AH);
+                if (scrollFrac <= 0 || !hintShown) return;
+                const cx = AW / 2, cy = AH / 2;
+                const r  = Math.min(AW, AH) * 0.05;
+                const startA = -Math.PI / 2;
+                const endA   = startA + Math.PI * 2 * scrollFrac;
+                const hue = 45 + scrollFrac * 20;
+                arcCtx.beginPath();
+                arcCtx.arc(cx, cy, r, startA, endA);
+                arcCtx.strokeStyle = `hsla(${hue},100%,65%,0.9)`;
+                arcCtx.lineWidth   = 4;
+                arcCtx.shadowColor = `hsla(${hue},100%,70%,1)`;
+                arcCtx.shadowBlur  = 14;
+                arcCtx.stroke();
+                arcCtx.shadowBlur  = 0;
+            }
+
+            // ─── Scroll-to-open logic ───────────────────────────────────────
+            const SCROLL_NEEDED = 900;
+            let scrollAccum = 0;
+            let scrollFrac  = 0;
+            let scrollDone  = false;
+            let hintShown   = false;
+
+            function applyGateOpen(frac) {
+                // Slide each door half apart
+                const pct = frac * 100;
+                doorLeft.style.transform  = `translateX(-${pct}%)`;
+                doorRight.style.transform = `translateX(${pct}%)`;
+
+                // Widen the light seam
+                const crackW = Math.max(3, frac * 80);
+                doorSeam.style.width = crackW + 'px';
+
+                // Burst light behind gate
+                gateBurst.style.opacity = String(frac * frac * 0.95);
+            }
+
+            function finishOpen() {
+                if (scrollDone) return;
+                scrollDone = true;
+
+                // Snap doors fully open
+                doorLeft.classList.add('snap-open');
+                doorRight.classList.add('snap-open');
+                doorLeft.style.transform  = 'translateX(-100%)';
+                doorRight.style.transform = 'translateX(100%)';
+
+                // Seam explodes to full width
+                doorSeam.style.transition = 'width 0.3s ease';
+                doorSeam.style.width = '100vw';
+
+                // Burst light goes full
+                gateBurst.style.transition = 'opacity 1s ease';
+                gateBurst.style.opacity = '1';
+
+                setTimeout(() => {
+                    // Fade out portal screen
+                    portalScreen.style.transition = 'opacity 1s ease';
+                    portalScreen.style.opacity = '0';
+                }, 1900);
+                setTimeout(() => {
+                    portalScreen.style.display = 'none';
+                    revealColorPicker();
+                }, 2900);
+            }
+
+            portalScreen.addEventListener('wheel', e => {
+                if (scrollDone || !hintShown) return;
+                e.preventDefault();
+                scrollAccum += Math.abs(e.deltaY);
+                scrollFrac = Math.min(scrollAccum / SCROLL_NEEDED, 1);
+                applyGateOpen(scrollFrac);
+                if (scrollFrac >= 1) finishOpen();
+            }, { passive: false });
+
+            // Touch support
+            let touchY0 = 0;
+            portalScreen.addEventListener('touchstart', e => { touchY0 = e.touches[0].clientY; }, { passive: true });
+            portalScreen.addEventListener('touchmove', e => {
+                if (scrollDone || !hintShown) return;
+                e.preventDefault();
+                const dy = Math.abs(touchY0 - e.touches[0].clientY);
+                scrollAccum += dy;
+                touchY0 = e.touches[0].clientY;
+                scrollFrac = Math.min(scrollAccum / SCROLL_NEEDED, 1);
+                applyGateOpen(scrollFrac);
+                if (scrollFrac >= 1) finishOpen();
+            }, { passive: false });
+
+            // ─── Main animation loop ─────────────────────────────────────────
+            let startT = performance.now();
+            function mainLoop() {
+                if (!scrollDone) {
+                    const elapsed = (performance.now() - startT) / 1000;
+                    drawSky();
+                    drawProgressArc();
+
+                    if (!hintShown && elapsed > 2.0) {
+                        hintShown = true;
+                        document.getElementById('scroll-hint').classList.add('visible');
+                    }
+                }
+                requestAnimationFrame(mainLoop);
+            }
+
+            // ─── Entrance sequence ──────────────────────────────────────────
+            setTimeout(() => {
+                titleEl.classList.add('visible');
+                subEl.classList.add('visible');
+            }, 800);
+
+            // Subtle initial crack glow
+            setTimeout(() => {
+                gateCrack.style.width   = '3px';
+                gateCrack.style.opacity = '0.5';
+                gateLight.style.transition = 'opacity 3s ease';
+                gateLight.style.opacity = '0.05';
+            }, 400);
+
+            mainLoop();
+
+            // ─── Legends + Picker ──────────────────────────────────────────────
+            const LEGENDS = [
+                { first: 'Magnus',      last: 'Carlsen',    color: '#22d3ee', badge: 'GOAT',      country: 'Norway 🇳🇴',  quote: '"Chess is everything — art, science and sport."',   img: 'legends/Magnus_Carlsen.jpg' },
+                { first: 'Garry',       last: 'Kasparov',   color: '#f87171', badge: 'LEGEND',    country: 'Russia 🇷🇺',  quote: '"Chess is mental torture."',                        img: 'legends/Garry_Kasparov.jpg' },
+                { first: 'Bobby',       last: 'Fischer',    color: '#93c5fd', badge: 'GENIUS',    country: 'USA 🇺🇸',     quote: '"I like the moment I break a man\'s ego."',           img: 'legends/Bobby_Fischer.jpg' },
+                { first: 'Viswanathan', last: 'Anand',      color: '#fdba74', badge: 'TIGER',     country: 'India 🇮🇳',   quote: '"Every game I play I learn something new."',          img: 'legends/Viswanathan_Anand.jpg' },
+                { first: 'Judit',       last: 'Polgar',     color: '#f9a8d4', badge: 'GREATEST',  country: 'Hungary 🇭🇺', quote: '"I never thought about whether I am a woman."',       img: 'legends/Judit_Polgár.jpg' },
+                { first: 'Anatoly',     last: 'Karpov',     color: '#6ee7b7', badge: 'BOA',       country: 'Russia 🇷🇺',  quote: '"Chess is art. Chess is science. Chess is sport."',   img: 'legends/Anatoly_Karpov.jpg' },
+                { first: 'Mikhail',     last: 'Tal',        color: '#c4b5fd', badge: 'MAGICIAN',  country: 'Latvia 🇱🇻',  quote: '"You must take your opponent into a deep dark forest."', img: 'legends/Mikhail_Tal.jpg' },
+                { first: 'José',        last: 'Capablanca', color: '#34d399', badge: 'PATRON',    country: 'Cuba 🇨🇺',    quote: '"Chess has no room for those who believe in luck."',  img: 'legends/José_Raúl_Capablanca.jpg' },
+                { first: 'Wilhelm',     last: 'Steinitz',   color: '#7dd3fc', badge: 'PATRIARCH', country: 'Austria 🇦🇹', quote: '"A gambit never won a game by being declined."',      img: 'legends/Wilhelm_Steinitz.jpg' },
+            ];
+
+            function buildMastersTrack() {
+                const track = document.getElementById('masters-track');
+                const all = [...LEGENDS, ...LEGENDS];
+                all.forEach(lg => {
+                    const cutout = document.createElement('div');
+                    cutout.className = 'master-cutout';
+                    cutout.style.setProperty('--theme-color', lg.color);
+                    cutout.innerHTML = `
+                    <div class="cutout-img-wrapper">
+                        <img src="${lg.img}" alt="${lg.first} ${lg.last}" class="cutout-img">
+                    </div>
+                    <div class="cutout-name-overlay">
+                        <span class="cutout-name-first">${lg.first}</span>
+                        <span class="cutout-name-last">${lg.last}</span>
+                    </div>
+                    <div class="cutout-fade-info">
+                        <div class="cutout-badge">✦ ${lg.badge} ✦</div>
+                        <div class="cutout-quote">${lg.quote}</div>
+                    </div>`;
+                    track.appendChild(cutout);
+                });
+            }
+
+            function spawnPickerStars() {
+                const container = document.getElementById('picker-stars');
+                for (let i = 0; i < 90; i++) {
+                    const s = document.createElement('div');
+                    s.className = 'star-dot';
+                    const sz = Math.random() * 3 + 1;
+                    const hue = Math.random() > 0.6 ? 52 : (Math.random() > 0.5 ? 270 : 220);
+                    s.style.cssText =
+                        `width:${sz}px;height:${sz}px;` +
+                        `left:${Math.random() * 100}%;top:${Math.random() * 100}%;` +
+                        `background:hsl(${hue},100%,${75 + Math.random() * 25}%);` +
+                        `--tw:${1.2 + Math.random() * 3}s;--td:${Math.random() * 4}s;`;
+                    container.appendChild(s);
+                }
+            }
+
+            function revealColorPicker() {
+                buildMastersTrack();
+                spawnPickerStars();
+                colorPicker.classList.add('active');
+            }
+
+            function onColorChosen(color) {
+                window.playerColor = color;
+                const chosenBox = color === 'white' ? pickWhite : pickBlack;
+                chosenBox.classList.add('chosen');
+                setTimeout(() => {
+                    colorPicker.style.display = 'none';
+                    document.getElementById('game-board-container').style.display = 'block';
+                }, 450);
+            }
+
+            pickWhite.addEventListener('click', () => onColorChosen('white'));
+            pickBlack.addEventListener('click', () => onColorChosen('black'));
+        })();
+    </script>
+
+    <!-- Load game logic -->
+    <script src="chess.js"></script>
+</body>
+
+</html>
+
