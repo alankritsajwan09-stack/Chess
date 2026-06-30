@@ -32,14 +32,6 @@ Chess/
    ```
 2. Open `Chess.html` in your web browser.
 
-That's it — no server or installation required.
-
-### Optional: Re-download legend images
-
-If you want to refresh or re-download the legend images used in the gallery:
-
-```bash
-python download_legends.py
 ```
 
 ## 🛠️ Built With
